@@ -128,13 +128,13 @@ void print_client_addr(struct sockaddr_in addr){
 }
 
 /* Handle all communication with the client */
-void *handle_client(void *arg){
+void *handle_client(client_t *cli)
+{
 	char buff_out[1024];
 	char buff_in[1024];
 	int rlen;
 
 	cli_count++;
-	client_t *cli = (client_t *)arg;
 
 	printf("<<ACCEPT ");
 	print_client_addr(cli->addr);
@@ -216,7 +216,6 @@ void *handle_client(void *arg){
 	}
 
 	/* Close connection */
-	close(cli->connfd);
 	sprintf(buff_out, "<<LEAVE, BYE %s\r\n", cli->name);
 	send_message_all(buff_out);
 
@@ -227,67 +226,32 @@ void *handle_client(void *arg){
 	printf(" REFERENCED BY %d\n", cli->uid);
 	free(cli);
 	cli_count--;
-	pthread_detach(pthread_self());
 	
 	return NULL;
 }
 
-int main(int argc, char *argv[]){
-	int listenfd = 0, connfd = 0;
-	struct sockaddr_in serv_addr;
-	struct sockaddr_in cli_addr;
-	pthread_t tid;
-
-	/* Socket settings */
-	listenfd = socket(AF_INET, SOCK_STREAM, 0);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(5000); 
-
-	/* Ignore pipe signals */
-	signal(SIGPIPE, SIG_IGN);
-	
-	/* Bind */
-	if(bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
-		perror("Socket binding failed");
-		return 1;
-	}
-
-	/* Listen */
-	if(listen(listenfd, 10) < 0){
-		perror("Socket listening failed");
-		return 1;
-	}
-
+int server_recive (struct sockaddr_in* addr, char* data, int len)
+{
 	printf("<[SERVER STARTED]>\n");
 
-	/* Accept clients */
-	while(1){
-		socklen_t clilen = sizeof(cli_addr);
-		connfd = accept(listenfd, (struct sockaddr*)&cli_addr, &clilen);
-
-		/* Check if max clients is reached */
-		if((cli_count+1) == MAX_CLIENTS){
-			printf("<<MAX CLIENTS REACHED\n");
-			printf("<<REJECT ");
-			print_client_addr(cli_addr);
-			printf("\n");
-			close(connfd);
-			continue;
-		}
-
-		/* Client settings */
-		client_t *cli = (client_t *)malloc(sizeof(client_t));
-		cli->addr = cli_addr;
-		cli->connfd = connfd;
-		cli->uid = uid++;
-		sprintf(cli->name, "%d", cli->uid);
-
-		/* Add client to the queue and fork thread */
-		queue_add(cli);
-		pthread_create(&tid, NULL, &handle_client, (void*)cli);
-
-		/* Reduce CPU usage */
-		sleep(1);
+	/* Check if max clients is reached */
+	if((cli_count + 1) == MAX_CLIENTS) {
+		printf("<<MAX CLIENTS REACHED\n");
+		printf("<<REJECT ");
+		print_client_addr(*addr);
+		printf("\n");
+		return 0;
 	}
+
+	/* Client settings */
+	client_t *cli = (client_t *)malloc(sizeof(client_t));
+	cli->addr = *addr;
+	cli->uid = uid++;
+	sprintf(cli->name, "%d", cli->uid);
+
+	/* Add client to the queue and fork thread */
+	queue_add(cli);
+	handle_client(cli);
+
+	return 1;
 }
