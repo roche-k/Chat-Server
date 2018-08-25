@@ -1,7 +1,7 @@
-Chat Server
+# Chat Server
 >  forked from yorickdewid/Chat-Server
 
-=
+----
 
 ## Add Feature
 
@@ -10,11 +10,11 @@ Chat Server
 
 
 ## Build
-Run GNU make in the repository
+Run BSD make in the repository
 `make`
 
 Then start
-`./chat_server`
+`kldload ./udp_hook.ko`
 
 ## Features
 * Accept multiple client (max 100)
